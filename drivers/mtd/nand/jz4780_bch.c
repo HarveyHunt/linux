@@ -61,8 +61,8 @@
 
 #define BCH_CLK_RATE			(200 * 1000 * 1000)
 
-/* Timeout for BCH calculation/correction in microseconds. */
-#define BCH_TIMEOUT			100000
+/* Timeout for BCH calculation/correction. */
+#define BCH_TIMEOUT_US			100000
 
 struct jz4780_bch {
 	void __iomem *base;
@@ -154,7 +154,7 @@ static bool jz4780_bch_wait_complete(struct jz4780_bch *bch, unsigned int irq,
 	 * actually quite noticeably decreases performance.
 	 */
 	ret = readl_poll_timeout(bch->base + BCH_BHINT, reg,
-				 (reg & irq) == irq, 0, BCH_TIMEOUT);
+				 (reg & irq) == irq, 0, BCH_TIMEOUT_US);
 	if (ret)
 		return false;
 

@@ -34,8 +34,8 @@
 #define OFFSET_CMD	0x00400000
 #define OFFSET_ADDR	0x00800000
 
-/* Command delay when there is no R/B pin (in microseconds). */
-#define RB_DELAY	100
+/* Command delay when there is no R/B pin. */
+#define RB_DELAY_US	100
 
 struct jz4780_nand_chip {
 	unsigned int bank;
@@ -281,7 +281,7 @@ static int jz4780_nand_probe(struct platform_device *pdev)
 	mtd->dev.parent = dev;
 
 	chip->dn = dev->of_node;
-	chip->chip_delay = RB_DELAY;
+	chip->chip_delay = RB_DELAY_US;
 	chip->options = NAND_NO_SUBPAGE_WRITE;
 	chip->select_chip = jz4780_nand_select_chip;
 	chip->cmd_ctrl = jz4780_nand_cmd_ctrl;
