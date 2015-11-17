@@ -280,7 +280,7 @@ static int jz4780_nand_probe(struct platform_device *pdev)
 	mtd->name = DRV_NAME;
 	mtd->dev.parent = dev;
 
-	chip->dn = dev->of_node;
+	chip->flash_node = dev->of_node;
 	chip->chip_delay = RB_DELAY_US;
 	chip->options = NAND_NO_SUBPAGE_WRITE;
 	chip->select_chip = jz4780_nand_select_chip;
