@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 
 #include "jz4780_bch.h"
 
@@ -67,6 +68,7 @@
 struct jz4780_bch {
 	void __iomem *base;
 	struct clk *clk;
+	spinlock_t lock;
 };
 
 static void jz4780_bch_init(struct jz4780_bch *bch,
@@ -180,6 +182,9 @@ int jz4780_bch_calculate(struct device *dev, struct jz4780_bch_params *params,
 {
 	struct jz4780_bch *bch = dev_get_drvdata(dev);
 	int ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&bch->lock, flags);
 
 	jz4780_bch_init(bch, params, true);
 	jz4780_bch_write_data(bch, buf, params->size);
@@ -191,6 +196,7 @@ int jz4780_bch_calculate(struct device *dev, struct jz4780_bch_params *params,
 		ret = -ETIMEDOUT;
 	}
 
+	spin_unlock_irqrestore(&bch->lock, flags);
 	jz4780_bch_disable(bch);
 	return ret;
 }
@@ -215,6 +221,9 @@ int jz4780_bch_correct(struct device *dev, struct jz4780_bch_params *params,
 	struct jz4780_bch *bch = dev_get_drvdata(dev);
 	uint32_t reg, mask, index;
 	int i, ret, count;
+	unsigned long flags;
+
+	spin_lock_irqsave(&bch->lock, flags);
 
 	jz4780_bch_init(bch, params, false);
 	jz4780_bch_write_data(bch, buf, params->size);
@@ -251,6 +260,7 @@ int jz4780_bch_correct(struct device *dev, struct jz4780_bch_params *params,
 	}
 
 out:
+	spin_unlock_irqrestore(&bch->lock, flags);
 	jz4780_bch_disable(bch);
 	return ret;
 }
@@ -324,6 +334,8 @@ static int jz4780_bch_probe(struct platform_device *pdev)
 	}
 
 	clk_set_rate(bch->clk, BCH_CLK_RATE);
+
+	spin_lock_init(&bch->lock);
 
 	platform_set_drvdata(pdev, bch);
 	return 0;
