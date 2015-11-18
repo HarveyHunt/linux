@@ -169,12 +169,6 @@ static int jz4780_nand_init_ecc(struct jz4780_nand *nand, struct device *dev)
 	int ret = 0;
 	uint32_t start, i;
 
-	if (!chip->ecc.size)
-		chip->ecc.size = 1024;
-
-	if (!chip->ecc.strength)
-		chip->ecc.strength = 24;
-
 	chip->ecc.bytes = fls(1 + 8 * chip->ecc.size) * chip->ecc.strength / 8;
 
 	if (chip->ecc.mode == NAND_ECC_HW) {
@@ -324,7 +318,7 @@ static int jz4780_nand_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	chip->ecc.mode = NAND_ECC_HW;
+	chip->ecc.mode = NAND_ECC_NONE;
 
 	ret = nand_scan_ident(mtd, num_banks, NULL);
 	if (ret)
