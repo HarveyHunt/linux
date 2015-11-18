@@ -196,6 +196,10 @@ static int jz4780_nand_init_ecc(struct jz4780_nand *nand, struct device *dev)
 	else
 		dev_info(dev, "not using ECC\n");
 
+	/* The NAND core will generate the ECC layout. */
+	if (chip->ecc.mode == NAND_ECC_SOFT || chip->ecc.mode == NAND_ECC_SOFT_BCH)
+		return 0;
+
 	/* Generate ECC layout. ECC codes are right aligned in the OOB area. */
 	layout->eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
 	start = mtd->oobsize - layout->eccbytes;
@@ -206,7 +210,6 @@ static int jz4780_nand_init_ecc(struct jz4780_nand *nand, struct device *dev)
 	layout->oobfree[0].length = mtd->oobsize - layout->eccbytes - 2;
 
 	chip->ecc.layout = layout;
-
 	return 0;
 }
 
