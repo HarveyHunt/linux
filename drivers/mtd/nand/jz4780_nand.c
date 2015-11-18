@@ -195,9 +195,12 @@ static int jz4780_nand_init_ecc(struct jz4780_nand *nand, struct device *dev)
 		chip->ecc.correct = jz4780_nand_ecc_correct;
 	}
 
-	dev_info(dev, "using %s BCH (strength %d, size %d, bytes %d)\n",
-		 (nand->bch) ? "hardware" : "software", chip->ecc.strength,
-		 chip->ecc.size, chip->ecc.bytes);
+	if (chip->ecc.mode != NAND_ECC_NONE)
+		dev_info(dev, "using %s BCH (strength %d, size %d, bytes %d)\n",
+			(nand->bch) ? "hardware" : "software", chip->ecc.strength,
+			chip->ecc.size, chip->ecc.bytes);
+	else
+		dev_info(dev, "not using ECC\n");
 
 	/* Generate ECC layout. ECC codes are right aligned in the OOB area. */
 	layout->eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
