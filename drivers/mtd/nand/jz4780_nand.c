@@ -177,10 +177,6 @@ static int jz4780_nand_init_ecc(struct jz4780_nand *nand, struct device *dev)
 
 	chip->ecc.bytes = fls(1 + 8 * chip->ecc.size) * chip->ecc.strength / 8;
 
-	dev_info(dev, "using %s BCH (strength %d, size %d, bytes %d)\n",
-		 (nand->bch) ? "hardware" : "software", chip->ecc.strength,
-		 chip->ecc.size, chip->ecc.bytes);
-
 	if (chip->ecc.mode == NAND_ECC_HW) {
 		bch_np = of_parse_phandle(dev->of_node,
 					"ingenic,bch-controller", 0);
@@ -198,6 +194,10 @@ static int jz4780_nand_init_ecc(struct jz4780_nand *nand, struct device *dev)
 		chip->ecc.calculate = jz4780_nand_ecc_calculate;
 		chip->ecc.correct = jz4780_nand_ecc_correct;
 	}
+
+	dev_info(dev, "using %s BCH (strength %d, size %d, bytes %d)\n",
+		 (nand->bch) ? "hardware" : "software", chip->ecc.strength,
+		 chip->ecc.size, chip->ecc.bytes);
 
 	/* Generate ECC layout. ECC codes are right aligned in the OOB area. */
 	layout->eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
