@@ -8,6 +8,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/of_mtd.h>
+#include <linux/gpio/consumer.h>
 #include <linux/mtd/nand.h>
 #include <linux/export.h>
 
@@ -117,3 +118,15 @@ bool of_get_nand_on_flash_bbt(struct device_node *np)
 	return of_property_read_bool(np, "nand-on-flash-bbt");
 }
 EXPORT_SYMBOL_GPL(of_get_nand_on_flash_bbt);
+
+/**
+ * of_get_nand_rb_gpio - Get Ready / Busy GPIO for given device_node.
+ * @np: Pointer to the given device_node.
+ *
+ * return valid gpio_desc if found, NULL if not or ERR_PTR otherwise.
+ */
+struct gpio_desc *of_get_nand_rb_gpio(struct device_node *np)
+{
+	return gpiod_get_optional(NULL, "rb", GPIOD_IN);
+}
+EXPORT_SYMBOL_GPL(of_get_nand_rb_gpio);

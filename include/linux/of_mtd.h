@@ -12,11 +12,13 @@
 #ifdef CONFIG_OF_MTD
 
 #include <linux/of.h>
+#include <linux/gpio/consumer.h>
 int of_get_nand_ecc_mode(struct device_node *np);
 int of_get_nand_ecc_step_size(struct device_node *np);
 int of_get_nand_ecc_strength(struct device_node *np);
 int of_get_nand_bus_width(struct device_node *np);
 bool of_get_nand_on_flash_bbt(struct device_node *np);
+struct gpio_desc *of_get_nand_rb_gpio(struct device_node *np);
 
 #else /* CONFIG_OF_MTD */
 
@@ -43,6 +45,11 @@ static inline int of_get_nand_bus_width(struct device_node *np)
 static inline bool of_get_nand_on_flash_bbt(struct device_node *np)
 {
 	return false;
+}
+
+static inline struct gpio_desc *of_get_nand_rb_gpio(struct device_node *np)
+{
+	return ERR_PTR(-ENOSYS);
 }
 
 #endif /* CONFIG_OF_MTD */

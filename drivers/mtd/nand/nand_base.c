@@ -37,6 +37,7 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/types.h>
+#include <linux/gpio/consumer.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/nand_ecc.h>
@@ -541,6 +542,19 @@ static void panic_nand_wait_ready(struct mtd_info *mtd, unsigned long timeo)
 		touch_softlockup_watchdog();
 		mdelay(1);
 	}
+}
+
+/**
+ * nand_dev_ready - [GENERIC] Check if a device is ready.
+ * @mtd: MTD device structure.
+ *
+ * return whether the device is ready or a negative errno in case of failure.
+ */
+static int nand_dev_ready(struct mtd_info *mtd)
+{
+	struct nand_chip *chip = mtd->priv;
+
+	return !(gpiod_get_value_cansleep(chip->rb_gpio));
 }
 
 /**
@@ -3941,6 +3955,7 @@ static int nand_dt_init(struct mtd_info *mtd, struct nand_chip *chip,
 			struct device_node *dn)
 {
 	int ecc_mode, ecc_strength, ecc_step;
+	struct gpio_desc *rb_gpio;
 
 	if (of_get_nand_bus_width(dn) == 16)
 		chip->options |= NAND_BUSWIDTH_16;
@@ -3951,6 +3966,7 @@ static int nand_dt_init(struct mtd_info *mtd, struct nand_chip *chip,
 	ecc_mode = of_get_nand_ecc_mode(dn);
 	ecc_strength = of_get_nand_ecc_strength(dn);
 	ecc_step = of_get_nand_ecc_step_size(dn);
+	rb_gpio = of_get_nand_rb_gpio(dn);
 
 	if ((ecc_step >= 0 && !(ecc_strength >= 0)) ||
 	    (!(ecc_step >= 0) && ecc_strength >= 0)) {
@@ -3966,6 +3982,11 @@ static int nand_dt_init(struct mtd_info *mtd, struct nand_chip *chip,
 
 	if (ecc_step > 0)
 		chip->ecc.size = ecc_step;
+
+	if (!IS_ERR_OR_NULL(rb_gpio)) {
+		chip->rb_gpio = rb_gpio;
+		chip->dev_ready = nand_dev_ready;
+	}
 
 	return 0;
 }
