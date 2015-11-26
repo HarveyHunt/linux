@@ -12,6 +12,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/list.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -19,7 +20,6 @@
 #include <linux/of_mtd.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
@@ -47,12 +47,14 @@ struct jz4780_nand_controller {
 	struct device *bch;
 	struct nand_hw_control controller;
 	unsigned int num_banks;
+	struct list_head chips;
 	struct jz4780_nand_cs cs[];
 };
 
 struct jz4780_nand_chip {
 	struct mtd_info mtd;
 	struct nand_chip chip;
+	struct list_head node;
 
 	struct nand_ecclayout ecclayout;
 
@@ -115,7 +117,6 @@ static void jz4780_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
 			nand->chip.IO_ADDR_W = cs->base + OFFSET_CMD;
 		else
 			nand->chip.IO_ADDR_W = cs->base + OFFSET_DATA;
-
 		jz4780_nemc_assert(nfc->dev, cs->bank, ctrl & NAND_NCE);
 	}
 
@@ -226,101 +227,47 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
 	return 0;
 }
 
-static int jz4780_nand_init_chips(struct jz4780_nand_chip *nand,
-				  struct platform_device *pdev)
+static int jz4780_nand_init_chip(struct platform_device *pdev,
+				struct jz4780_nand_controller *nfc,
+				struct device_node *np,
+				unsigned int chipnr)
 {
 	struct device *dev = &pdev->dev;
-	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(nand->chip.controller);
-	struct jz4780_nand_cs *cs;
-	const __be32 *prop;
-	struct resource *res;
-	int i = 0;
-	int num_chips = of_get_child_count(dev->of_node);
-
-	if (num_chips > nfc->num_banks) {
-		dev_err(dev, "found %d chips but only %d banks\n", num_chips, nfc->num_banks);
-		return -EINVAL;
-	}
-
-	/*
-	 * Iterate over each bank assigned to this device and request resources.
-	 * The bank numbers may not be consecutive, but nand_scan_ident()
-	 * expects chip numbers to be, so fill out a consecutive array of chips
-	 * which map chip number to actual bank number.
-	 */
-	while ((prop = of_get_address(dev->of_node, i, NULL, NULL))) {
-		cs = &nfc->cs[i];
-		cs->bank = of_read_number(prop, 1);
-
-		jz4780_nemc_set_type(nfc->dev, cs->bank,
-				     JZ4780_NEMC_BANK_NAND);
-
-		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-		cs->base = devm_ioremap_resource(dev, res);
-		if (IS_ERR(cs->base))
-			return PTR_ERR(cs->base);
-
-		i++;
-	}
-
-	return 0;
-}
-
-static int jz4780_nand_probe(struct platform_device *pdev)
-{
-	struct device *dev = &pdev->dev;
-	unsigned int num_banks;
 	struct jz4780_nand_chip *nand;
-	struct jz4780_nand_controller *nfc;
-	struct mtd_info *mtd;
+	struct jz4780_nand_cs *cs;
+	struct resource *res;
 	struct nand_chip *chip;
+	struct mtd_info *mtd;
 	struct mtd_part_parser_data ppdata;
-	int ret;
+	int ret = 0;
 
-	num_banks = jz4780_nemc_num_banks(dev);
-	if (num_banks == 0) {
-		dev_err(dev, "no banks found\n");
-		return -ENODEV;
-	}
+	cs = &nfc->cs[chipnr];
 
-	nfc = devm_kzalloc(dev, sizeof(*nfc) + (sizeof(nfc->cs[0]) * num_banks), GFP_KERNEL);
-	if (!nfc)
-		return -ENOMEM;
+	jz4780_nemc_set_type(nfc->dev, cs->bank,
+				JZ4780_NEMC_BANK_NAND);
 
-	nand = devm_kzalloc(dev,
-			sizeof(*nand) + (sizeof(nfc->cs[0]) * num_banks),
-			GFP_KERNEL);
+	res = platform_get_resource(pdev, IORESOURCE_MEM, chipnr);
+	cs->base = devm_ioremap_resource(dev, res);
+	if (IS_ERR(cs->base))
+		return PTR_ERR(cs->base);
+
+	nand = devm_kzalloc(dev, sizeof(*nand), GFP_KERNEL);
 	if (!nand)
 		return -ENOMEM;
 
-	nfc->dev = dev;
-	nfc->num_banks = num_banks;
-	nand->selected = -1;
-
-	mtd = &nand->mtd;
-	chip = &nand->chip;
-	mtd->priv = chip;
-	mtd->owner = THIS_MODULE;
-	mtd->name = DRV_NAME;
-	mtd->dev.parent = dev;
-
-	chip->flash_node = dev->of_node;
-	chip->chip_delay = RB_DELAY_US;
-	chip->options = NAND_NO_SUBPAGE_WRITE;
-	chip->select_chip = jz4780_nand_select_chip;
-	chip->cmd_ctrl = jz4780_nand_cmd_ctrl;
-
 	nand->busy_gpio = devm_gpiod_get_optional(dev, "rb", GPIOD_IN);
+
 	if (IS_ERR(nand->busy_gpio)) {
 		ret = PTR_ERR(nand->busy_gpio);
 		dev_err(dev, "failed to request busy GPIO: %d\n", ret);
 		return ret;
 	} else if (nand->busy_gpio) {
 		nand->busy_gpio_active_low = gpiod_is_active_low(nand->busy_gpio);
-		chip->dev_ready = jz4780_nand_dev_ready;
+		nand->chip.dev_ready = jz4780_nand_dev_ready;
 	}
 
 	nand->wp_gpio = devm_gpiod_get_optional(dev, "wp", GPIOD_OUT_LOW);
+
 	if (IS_ERR(nand->wp_gpio)) {
 		ret = PTR_ERR(nand->wp_gpio);
 		dev_err(dev, "failed to request WP GPIO: %d\n", ret);
@@ -329,14 +276,23 @@ static int jz4780_nand_probe(struct platform_device *pdev)
 		nand->wp_gpio_active_low = gpiod_is_active_low(nand->wp_gpio);
 	}
 
+	nand->selected = -1;
+	mtd = &nand->mtd;
+	chip = &nand->chip;
+	mtd->priv = chip;
+	mtd->owner = THIS_MODULE;
+	mtd->name = DRV_NAME;
+	mtd->dev.parent = dev;
 
-	ret = jz4780_nand_init_chips(nand, pdev);
-	if (ret)
-		return ret;
-
+	chip->flash_node = np;
+	chip->chip_delay = RB_DELAY_US;
+	chip->options = NAND_NO_SUBPAGE_WRITE;
+	chip->select_chip = jz4780_nand_select_chip;
+	chip->cmd_ctrl = jz4780_nand_cmd_ctrl;
 	chip->ecc.mode = NAND_ECC_NONE;
+	chip->controller = &nfc->controller;
 
-	ret = nand_scan_ident(mtd, num_banks, NULL);
+	ret = nand_scan_ident(mtd, 1, NULL);
 	if (ret)
 		return ret;
 
@@ -353,7 +309,6 @@ static int jz4780_nand_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_release_nand;
 
-	platform_set_drvdata(pdev, nand);
 	return 0;
 
 err_release_nand:
@@ -364,6 +319,82 @@ err_release_bch:
 		jz4780_bch_release(nfc->bch);
 
 	return ret;
+}
+
+static int jz4780_nand_init_chips(struct jz4780_nand_controller *nfc,
+				  struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct device_node *np;
+	struct jz4780_nand_cs *cs;
+	int i = 0;
+	int ret;
+	const __be32 *reg;
+	int num_chips = of_get_child_count(dev->of_node);
+
+	if (num_chips > nfc->num_banks) {
+		dev_err(dev, "found %d chips but only %d banks\n", num_chips, nfc->num_banks);
+		return -EINVAL;
+	}
+
+
+	/*
+	 * Iterate over each bank assigned to this device and request resources.
+	 * The bank numbers may not be consecutive, but nand_scan_ident()
+	 * expects chip numbers to be, so fill out a consecutive array of chips
+	 * which map chip number to actual bank number.
+	 */
+	for_each_child_of_node(dev->of_node, np) {
+		/* TODO: Maybe move this into init_chip. */
+		cs = &nfc->cs[i];
+
+		reg = of_get_property(np, "reg", NULL);
+		if (reg == NULL)
+			return -EINVAL;
+
+		cs->bank = be32_to_cpu(*reg);
+
+		ret = jz4780_nand_init_chip(pdev, nfc, np, i);
+		if (ret)
+			return ret;
+
+		i++;
+	}
+
+	return 0;
+}
+
+
+static int jz4780_nand_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	unsigned int num_banks;
+	struct jz4780_nand_controller *nfc;
+	int ret;
+
+	num_banks = jz4780_nemc_num_banks(dev);
+	if (num_banks == 0) {
+		dev_err(dev, "no banks found\n");
+		return -ENODEV;
+	}
+
+	nfc = devm_kzalloc(dev, sizeof(*nfc) + (sizeof(nfc->cs[0]) * num_banks), GFP_KERNEL);
+	if (!nfc)
+		return -ENOMEM;
+
+	nfc->dev = dev;
+	nfc->num_banks = num_banks;
+
+	spin_lock_init(&nfc->controller.lock);
+	INIT_LIST_HEAD(&nfc->chips);
+	init_waitqueue_head(&nfc->controller.wq);
+
+	ret = jz4780_nand_init_chips(nfc, pdev);
+	if (ret)
+		return ret;
+
+	platform_set_drvdata(pdev, nfc);
+	return 0;
 }
 
 static int jz4780_nand_remove(struct platform_device *pdev)
