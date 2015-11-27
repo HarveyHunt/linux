@@ -186,16 +186,19 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
 	chip->ecc.bytes = fls(1 + 8 * chip->ecc.size) * chip->ecc.strength / 8;
 
 	if (chip->ecc.mode == NAND_ECC_HW) {
-		bch_np = of_parse_phandle(dev->of_node,
-					"ingenic,bch-controller", 0);
-		if (bch_np) {
-			ret = jz4780_bch_get(bch_np, &nfc->bch);
-			of_node_put(bch_np);
-			if (ret)
-				return ret;
-		} else {
-			dev_err(dev, "no bch controller in DT\n");
-			return -ENODEV;
+		/* Only setup the BCH controller once. */
+		if (!nfc->bch) {
+			bch_np = of_parse_phandle(dev->of_node,
+						"ingenic,bch-controller", 0);
+			if (bch_np) {
+				ret = jz4780_bch_get(bch_np, &nfc->bch);
+				of_node_put(bch_np);
+				if (ret)
+					return ret;
+			} else {
+				dev_err(dev, "no bch controller in DT\n");
+				return -ENODEV;
+			}
 		}
 
 		chip->ecc.hwctl = jz4780_nand_ecc_hwctl;
