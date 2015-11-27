@@ -54,7 +54,7 @@ struct jz4780_nand_controller {
 struct jz4780_nand_chip {
 	struct mtd_info mtd;
 	struct nand_chip chip;
-	struct list_head node;
+	struct list_head chip_list;
 
 	struct nand_ecclayout ecclayout;
 
@@ -402,8 +402,14 @@ static int jz4780_nand_probe(struct platform_device *pdev)
 
 static int jz4780_nand_remove(struct platform_device *pdev)
 {
-	struct jz4780_nand_chip *nand = platform_get_drvdata(pdev);
-	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(nand->chip.controller);
+	struct jz4780_nand_chip *chip;
+	struct jz4780_nand_controller *nfc = platform_get_drvdata(pdev);
+
+	while (!list_empty(&nfc->chips)) {
+		chip = list_first_entry(&nfc->chips, struct jz4780_nand_chip, chip_list);
+		nand_release(&chip->mtd);
+		list_del(&chip->chip_list);
+	}
 
 	if (nfc->bch)
 		jz4780_bch_release(nfc->bch);
