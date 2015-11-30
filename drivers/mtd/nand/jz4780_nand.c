@@ -48,6 +48,7 @@ struct jz4780_nand_controller {
 	struct nand_hw_control controller;
 	unsigned int num_banks;
 	struct list_head chips;
+	int selected;
 	struct jz4780_nand_cs cs[];
 };
 
@@ -63,8 +64,6 @@ struct jz4780_nand_chip {
 	unsigned int busy_gpio_active_low: 1;
 	unsigned int wp_gpio_active_low: 1;
 	unsigned int reading: 1;
-
-	int selected;
 };
 
 static inline struct jz4780_nand_chip *to_jz4780_nand_chip(struct mtd_info *mtd)
@@ -85,8 +84,8 @@ static void jz4780_nand_select_chip(struct mtd_info *mtd, int chipnr)
 
 	if (chipnr == -1) {
 		/* Ensure the currently selected chip is deasserted. */
-		if (nand->selected >= 0) {
-			cs = &nfc->cs[nand->selected];
+		if (nfc->selected >= 0) {
+			cs = &nfc->cs[nfc->selected];
 			jz4780_nemc_assert(nfc->dev, cs->bank, false);
 		}
 	} else {
@@ -95,7 +94,7 @@ static void jz4780_nand_select_chip(struct mtd_info *mtd, int chipnr)
 		nand->chip.IO_ADDR_W = cs->base + OFFSET_DATA;
 	}
 
-	nand->selected = chipnr;
+	nfc->selected = chipnr;
 }
 
 static void jz4780_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
@@ -105,10 +104,10 @@ static void jz4780_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
 	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(nand->chip.controller);
 	struct jz4780_nand_cs *cs;
 
-	if (WARN_ON(nand->selected < 0))
+	if (WARN_ON(nfc->selected < 0))
 		return;
 
-	cs = &nfc->cs[nand->selected];
+	cs = &nfc->cs[nfc->selected];
 
 	if (ctrl & NAND_CTRL_CHANGE) {
 		if (ctrl & NAND_ALE)
@@ -279,7 +278,6 @@ static int jz4780_nand_init_chip(struct platform_device *pdev,
 		nand->wp_gpio_active_low = gpiod_is_active_low(nand->wp_gpio);
 	}
 
-	nand->selected = -1;
 	mtd = &nand->mtd;
 	chip = &nand->chip;
 	mtd->priv = chip;
