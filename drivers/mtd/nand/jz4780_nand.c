@@ -240,13 +240,19 @@ static int jz4780_nand_init_chip(struct platform_device *pdev,
 	struct resource *res;
 	struct nand_chip *chip;
 	struct mtd_info *mtd;
+	const __be32 *reg;
 	struct mtd_part_parser_data ppdata;
 	int ret = 0;
 
 	cs = &nfc->cs[chipnr];
 
-	jz4780_nemc_set_type(nfc->dev, cs->bank,
-				JZ4780_NEMC_BANK_NAND);
+	reg = of_get_property(np, "reg", NULL);
+	if (reg == NULL)
+		return -EINVAL;
+
+	cs->bank = be32_to_cpu(*reg);
+
+	jz4780_nemc_set_type(nfc->dev, cs->bank, JZ4780_NEMC_BANK_NAND);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, chipnr);
 	cs->base = devm_ioremap_resource(dev, res);
@@ -327,10 +333,8 @@ static int jz4780_nand_init_chips(struct jz4780_nand_controller *nfc,
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *np;
-	struct jz4780_nand_cs *cs;
 	int i = 0;
 	int ret;
-	const __be32 *reg;
 	int num_chips = of_get_child_count(dev->of_node);
 
 	if (num_chips > nfc->num_banks) {
@@ -346,15 +350,6 @@ static int jz4780_nand_init_chips(struct jz4780_nand_controller *nfc,
 	 * which map chip number to actual bank number.
 	 */
 	for_each_child_of_node(dev->of_node, np) {
-		/* TODO: Maybe move this into init_chip. */
-		cs = &nfc->cs[i];
-
-		reg = of_get_property(np, "reg", NULL);
-		if (reg == NULL)
-			return -EINVAL;
-
-		cs->bank = be32_to_cpu(*reg);
-
 		ret = jz4780_nand_init_chip(pdev, nfc, np, i);
 		if (ret)
 			return ret;
