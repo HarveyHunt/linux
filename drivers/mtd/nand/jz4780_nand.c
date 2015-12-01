@@ -15,7 +15,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
-#include <linux/of_gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/of_mtd.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -51,8 +51,8 @@ struct jz4780_nand {
 
 	struct nand_ecclayout ecclayout;
 
-	int busy_gpio;
-	int wp_gpio;
+	struct gpio_desc *busy_gpio;
+	struct gpio_desc *wp_gpio;
 	unsigned int busy_gpio_active_low: 1;
 	unsigned int wp_gpio_active_low: 1;
 	unsigned int reading: 1;
@@ -117,7 +117,7 @@ static int jz4780_nand_dev_ready(struct mtd_info *mtd)
 {
 	struct jz4780_nand *nand = to_jz4780_nand(mtd);
 
-	return !(gpio_get_value(nand->busy_gpio) ^ nand->busy_gpio_active_low);
+	return !(gpiod_get_value_cansleep(nand->busy_gpio) ^ nand->busy_gpio_active_low);
 }
 
 static void jz4780_nand_ecc_hwctl(struct mtd_info *mtd, int mode)
@@ -286,36 +286,25 @@ static int jz4780_nand_probe(struct platform_device *pdev)
 	chip->select_chip = jz4780_nand_select_chip;
 	chip->cmd_ctrl = jz4780_nand_cmd_ctrl;
 
-	nand->busy_gpio = of_get_named_gpio_flags(dev->of_node,
-						  "rb-gpios",
-						  0, &flags);
-	if (gpio_is_valid(nand->busy_gpio)) {
-		ret = devm_gpio_request(dev, nand->busy_gpio, "NAND busy");
-		if (ret) {
-			dev_err(dev, "failed to request busy GPIO %d: %d\n",
-				nand->busy_gpio, ret);
-			return ret;
-		}
-
-		nand->busy_gpio_active_low = flags & OF_GPIO_ACTIVE_LOW;
-		gpio_direction_input(nand->busy_gpio);
-
+	nand->busy_gpio = devm_gpiod_get_optional(dev, "rb", GPIOD_IN);
+	if (IS_ERR(nand->busy_gpio)) {
+		ret = PTR_ERR(nand->busy_gpio);
+		dev_err(dev, "failed to request busy GPIO: %d\n", ret);
+		return ret;
+	} else if (nand->busy_gpio) {
+		nand->busy_gpio_active_low = gpiod_is_active_low(nand->busy_gpio);
 		chip->dev_ready = jz4780_nand_dev_ready;
 	}
 
-	nand->wp_gpio = of_get_named_gpio_flags(dev->of_node, "wp-gpios",
-						0, &flags);
-	if (gpio_is_valid(nand->wp_gpio)) {
-		ret = devm_gpio_request(dev, nand->wp_gpio, "NAND WP");
-		if (ret) {
-			dev_err(dev, "failed to request WP GPIO %d: %d\n",
-				nand->wp_gpio, ret);
-			return ret;
-		}
-
-		nand->wp_gpio_active_low = flags & OF_GPIO_ACTIVE_LOW;
-		gpio_direction_output(nand->wp_gpio, nand->wp_gpio_active_low);
+	nand->wp_gpio = devm_gpiod_get_optional(dev, "wp", GPIOD_OUT_LOW);
+	if (IS_ERR(nand->wp_gpio)) {
+		ret = PTR_ERR(nand->wp_gpio);
+		dev_err(dev, "failed to request WP GPIO: %d\n", ret);
+		return ret;
+	} else if (nand->wp_gpio) {
+		nand->wp_gpio_active_low = gpiod_is_active_low(nand->wp_gpio);
 	}
+
 
 	ret = jz4780_nand_init_chips(nand, pdev);
 	if (ret)
