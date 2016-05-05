@@ -40,8 +40,8 @@ struct jz4780_pinctrl;
 
 struct jz4780_pinctrl_pin {
 	struct jz4780_gpio_chip *gpio_chip;
-	unsigned idx;
-	unsigned func;
+	unsigned int idx;
+	unsigned int func;
 	unsigned long bias;
 };
 
@@ -49,23 +49,23 @@ struct jz4780_pinctrl_group {
 	const char *name;
 	struct device_node *of_node;
 
-	unsigned num_pins;
+	unsigned int num_pins;
 	struct jz4780_pinctrl_pin *pins;
-	unsigned *pin_indices;
+	unsigned int *pin_indices;
 };
 
 struct jz4780_pinctrl_func {
 	const char *name;
 	struct device_node *of_node;
 
-	unsigned num_groups;
+	unsigned int num_groups;
 	struct jz4780_pinctrl_group **groups;
 	const char **group_names;
 };
 
 struct jz4780_gpio_chip {
 	char name[3];
-	unsigned idx;
+	unsigned int idx;
 	struct gpio_chip gc;
 	struct jz4780_pinctrl *pinctrl;
 	uint32_t pull_ups;
@@ -82,13 +82,13 @@ struct jz4780_pinctrl {
 	struct pinctrl_dev *pctl;
 	struct pinctrl_pin_desc *pdesc;
 
-	unsigned num_gpio_chips;
+	unsigned int num_gpio_chips;
 	struct jz4780_gpio_chip *gpio_chips;
 
-	unsigned num_groups;
+	unsigned int num_groups;
 	struct jz4780_pinctrl_group *groups;
 
-	unsigned num_funcs;
+	unsigned int num_funcs;
 	struct jz4780_pinctrl_func *funcs;
 };
 
@@ -122,6 +122,7 @@ static struct jz4780_pinctrl_group *find_group_by_of_node(
 		struct jz4780_pinctrl *jzpc, struct device_node *np)
 {
 	int i;
+
 	for (i = 0; i < jzpc->num_groups; i++) {
 		if (jzpc->groups[i].of_node == np)
 			return &jzpc->groups[i];
@@ -133,6 +134,7 @@ static struct jz4780_pinctrl_func *find_func_by_of_node(
 		struct jz4780_pinctrl *jzpc, struct device_node *np)
 {
 	int i;
+
 	for (i = 0; i < jzpc->num_funcs; i++) {
 		if (jzpc->funcs[i].of_node == np)
 			return &jzpc->funcs[i];
@@ -140,7 +142,7 @@ static struct jz4780_pinctrl_func *find_func_by_of_node(
 	return NULL;
 }
 
-static u32 jz4780_gpio_readl(struct jz4780_gpio_chip *jzgc, unsigned offset)
+static u32 jz4780_gpio_readl(struct jz4780_gpio_chip *jzgc, unsigned int offset)
 {
 	void __iomem *base = jzgc->pinctrl->io_base +
 		(jzgc->idx * GPIO_REGS_SIZE);
@@ -148,14 +150,15 @@ static u32 jz4780_gpio_readl(struct jz4780_gpio_chip *jzgc, unsigned offset)
 }
 
 static void jz4780_gpio_writel(struct jz4780_gpio_chip *jzgc, u32 value,
-		unsigned offset)
+		unsigned int offset)
 {
 	void __iomem *base = jzgc->pinctrl->io_base +
 		(jzgc->idx * GPIO_REGS_SIZE);
 	writel(value, base + offset);
 }
 
-static void jz4780_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
+static void jz4780_gpio_set(struct gpio_chip *gc, unsigned int offset,
+			    int value)
 {
 	struct jz4780_gpio_chip *jzgc = gc_to_jzgc(gc);
 
@@ -165,25 +168,26 @@ static void jz4780_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
 		jz4780_gpio_writel(jzgc, 1 << offset, GPIO_PAT0C);
 }
 
-static int jz4780_gpio_get(struct gpio_chip *gc, unsigned offset)
+static int jz4780_gpio_get(struct gpio_chip *gc, unsigned int offset)
 {
 	struct jz4780_gpio_chip *jzgc = gc_to_jzgc(gc);
+
 	return (jz4780_gpio_readl(jzgc, GPIO_PIN) >> offset) & 0x1;
 }
 
-static int jz4780_gpio_direction_input(struct gpio_chip *gc, unsigned offset)
+static int jz4780_gpio_direction_input(struct gpio_chip *gc, unsigned int offset)
 {
 	return pinctrl_gpio_direction_input(gc->base + offset);
 }
 
-static int jz4780_gpio_direction_output(struct gpio_chip *gc, unsigned offset,
+static int jz4780_gpio_direction_output(struct gpio_chip *gc, unsigned int offset,
 					int value)
 {
 	jz4780_gpio_set(gc, offset, value);
 	return pinctrl_gpio_direction_output(gc->base + offset);
 }
 
-static int jz4780_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+static int jz4780_gpio_to_irq(struct gpio_chip *gc, unsigned int offset)
 {
 	struct jz4780_gpio_chip *jzgc = gc_to_jzgc(gc);
 	int virq;
@@ -198,19 +202,21 @@ static int jz4780_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
 static void jz4780_gpio_irq_mask(struct irq_data *irqd)
 {
 	struct jz4780_gpio_chip *jzgc = irq_data_get_irq_chip_data(irqd);
+
 	jz4780_gpio_writel(jzgc, 1 << irqd->hwirq, GPIO_MSKS);
 }
 
 static void jz4780_gpio_irq_unmask(struct irq_data *irqd)
 {
 	struct jz4780_gpio_chip *jzgc = irq_data_get_irq_chip_data(irqd);
+
 	jz4780_gpio_writel(jzgc, 1 << irqd->hwirq, GPIO_MSKC);
 }
 
 static void jz4780_gpio_irq_ack(struct irq_data *irqd)
 {
 	struct jz4780_gpio_chip *jzgc = irq_data_get_irq_chip_data(irqd);
-	unsigned pin;
+	unsigned int pin;
 
 	if (irqd_get_trigger_type(irqd) == IRQ_TYPE_EDGE_BOTH) {
 		/*
@@ -230,7 +236,7 @@ static void jz4780_gpio_irq_ack(struct irq_data *irqd)
 static int jz4780_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
 {
 	struct jz4780_gpio_chip *jzgc = irq_data_get_irq_chip_data(irqd);
-	unsigned pin;
+	unsigned int pin;
 	enum {
 		PAT_EDGE_RISING		= 0x3,
 		PAT_EDGE_FALLING	= 0x2,
@@ -302,20 +308,22 @@ static void jz4780_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 static int jz4780_pinctrl_get_groups_count(struct pinctrl_dev *pctldev)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
+
 	return jzpc->num_groups;
 }
 
 static const char *jz4780_pinctrl_get_group_name(struct pinctrl_dev *pctldev,
-						 unsigned selector)
+						 unsigned int selector)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
+
 	return jzpc->groups[selector].name;
 }
 
 static int jz4780_pinctrl_get_group_pins(struct pinctrl_dev *pctldev,
-					 unsigned selector,
-					 const unsigned **pins,
-					 unsigned *num_pins)
+					 unsigned int selector,
+					 const unsigned int **pins,
+					 unsigned int *num_pins)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
 
@@ -330,13 +338,13 @@ static int jz4780_pinctrl_get_group_pins(struct pinctrl_dev *pctldev,
 static int jz4780_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
 					 struct device_node *np,
 					 struct pinctrl_map **map,
-					 unsigned *num_maps)
+					 unsigned int *num_maps)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
 	struct jz4780_pinctrl_func *func;
 	struct jz4780_pinctrl_group *group;
 	struct pinctrl_map *new_map;
-	unsigned map_num, i;
+	unsigned int map_num, i;
 
 	group = find_group_by_of_node(jzpc, np);
 	if (!group)
@@ -371,7 +379,7 @@ static int jz4780_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
 
 static void jz4780_pinctrl_dt_free_map(struct pinctrl_dev *pctldev,
 				       struct pinctrl_map *map,
-				       unsigned num_maps)
+				       unsigned int num_maps)
 {
 }
 
@@ -386,20 +394,22 @@ static struct pinctrl_ops jz4780_pctlops = {
 static int jz4780_pinmux_get_functions_count(struct pinctrl_dev *pctldev)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
+
 	return jzpc->num_funcs;
 }
 
 static const char *jz4780_pinmux_get_function_name(struct pinctrl_dev *pctldev,
-						   unsigned selector)
+						   unsigned int selector)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
+
 	return jzpc->funcs[selector].name;
 }
 
 static int jz4780_pinmux_get_function_groups(struct pinctrl_dev *pctldev,
-					     unsigned selector,
+					     unsigned int selector,
 					     const char * const **groups,
-					     unsigned * const num_groups)
+					     unsigned int * const num_groups)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
 
@@ -415,7 +425,7 @@ static int jz4780_pinmux_get_function_groups(struct pinctrl_dev *pctldev,
 static int jz4780_pinmux_set_pin_fn(struct jz4780_pinctrl *jzpc,
 				    struct jz4780_pinctrl_pin *pin)
 {
-	unsigned idx = pin->idx % PINS_PER_GPIO_PORT;
+	unsigned int idx = pin->idx % PINS_PER_GPIO_PORT;
 
 	dev_dbg(jzpc->dev, "set pin P%c%u to function %u\n",
 		'A' + pin->gpio_chip->idx, idx, pin->func);
@@ -432,12 +442,12 @@ static int jz4780_pinmux_set_pin_fn(struct jz4780_pinctrl *jzpc,
 	return 0;
 }
 
-static int jz4780_pinmux_set_mux(struct pinctrl_dev *pctldev, unsigned selector,
-				unsigned group)
+static int jz4780_pinmux_set_mux(struct pinctrl_dev *pctldev, unsigned int selector,
+				unsigned int group)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
 	struct jz4780_pinctrl_group *grp = &jzpc->groups[group];
-	unsigned i;
+	unsigned int i;
 	int err = 0;
 
 	if (selector >= jzpc->num_funcs || group >= jzpc->num_groups)
@@ -454,10 +464,10 @@ static int jz4780_pinmux_set_mux(struct pinctrl_dev *pctldev, unsigned selector,
 
 static int jz4780_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
 					    struct pinctrl_gpio_range *range,
-					    unsigned offset, bool input)
+					    unsigned int offset, bool input)
 {
 	struct jz4780_gpio_chip *jzgc = gc_to_jzgc(range->gc);
-	unsigned idx;
+	unsigned int idx;
 
 	idx = offset - (jzgc->idx * PINS_PER_GPIO_PORT);
 
@@ -482,7 +492,7 @@ static int jz4780_pinconf_get(struct pinctrl_dev *pctldev,
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
 	struct jz4780_gpio_chip *jzgc;
 	enum pin_config_param param = pinconf_to_config_param(*config);
-	unsigned idx, pull;
+	unsigned int idx, pull;
 
 	if (pin >= (jzpc->num_gpio_chips * PINS_PER_GPIO_PORT))
 		return -EINVAL;
@@ -517,11 +527,11 @@ static int jz4780_pinconf_get(struct pinctrl_dev *pctldev,
 
 static int jz4780_pinconf_set(struct pinctrl_dev *pctldev,
 			      unsigned int pin, unsigned long *configs,
-			      unsigned num_configs)
+			      unsigned int num_configs)
 {
 	struct jz4780_pinctrl *jzpc = pinctrl_dev_get_drvdata(pctldev);
 	struct jz4780_gpio_chip *jzgc;
-	unsigned idx, cfg;
+	unsigned int idx, cfg;
 
 	if (pin >= (jzpc->num_gpio_chips * PINS_PER_GPIO_PORT))
 		return -EINVAL;
@@ -566,7 +576,7 @@ static int jz4780_pinctrl_parse_dt_gpio(struct jz4780_pinctrl *jzpc,
 					struct jz4780_gpio_chip *jzgc,
 					struct device_node *np)
 {
-	unsigned gpio;
+	unsigned int gpio;
 	int err, irq;
 
 	jzgc->pinctrl = jzpc;
@@ -663,7 +673,7 @@ static int jz4780_pinctrl_parse_dt_pincfg(struct jz4780_pinctrl *jzpc,
 			break;
 		default:
 			dev_err(jzpc->dev, "unhandled pinconf parameter %u",
-					(unsigned)conf_param);
+					(unsigned int)conf_param);
 			err = -EINVAL;
 			goto out;
 		}
@@ -676,7 +686,7 @@ out:
 
 static int jz4780_pinctrl_parse_dt_func(struct jz4780_pinctrl *jzpc,
 					struct device_node *np,
-					unsigned *ifunc, unsigned *igroup)
+					unsigned int *ifunc, unsigned int *igroup)
 {
 	struct jz4780_pinctrl_func *func;
 	struct jz4780_pinctrl_group *grp;
@@ -685,9 +695,9 @@ static int jz4780_pinctrl_parse_dt_func(struct jz4780_pinctrl *jzpc,
 	phandle gpio_handle, cfg_handle;
 	struct property *pp;
 	__be32 *plist;
-	unsigned i, j;
+	unsigned int i, j;
 	int err;
-	const unsigned vals_per_pin = 4;
+	const unsigned int vals_per_pin = 4;
 
 	func = &jzpc->funcs[(*ifunc)++];
 	func->of_node = np;
@@ -765,7 +775,7 @@ static int jz4780_pinctrl_probe(struct platform_device *pdev)
 	struct jz4780_gpio_chip *jzgc;
 	struct pinctrl_desc *pctl_desc;
 	struct device_node *np, *group_node;
-	unsigned i, j;
+	unsigned int i, j;
 	int err;
 
 	if (!dev->of_node) {
