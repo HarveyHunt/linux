@@ -311,6 +311,8 @@ config MACH_INGENIC
 	select BUILTIN_DTB
 	select USE_OF
 	select LIBFDT
+    select PINCTRL
+    select PINCTRL_JZ4780
 
 config LANTIQ
 	bool "Lantiq based platforms"
