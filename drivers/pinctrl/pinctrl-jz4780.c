@@ -930,7 +930,6 @@ static struct platform_driver jz4780_pinctrl_driver = {
 	.probe		= jz4780_pinctrl_probe,
 	.driver = {
 		.name	= "jz4780-pinctrl",
-		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(jz4780_pinctrl_dt_match),
 	},
 };
