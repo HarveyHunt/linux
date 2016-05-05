@@ -267,9 +267,9 @@ static int jz4780_gpio_irq_set_type(struct irq_data *irqd, unsigned int type)
 	}
 
 	if (type & IRQ_TYPE_EDGE_BOTH)
-		__irq_set_handler_locked(irqd->irq, handle_edge_irq);
+		irq_set_handler_locked(irqd, handle_edge_irq);
 	else
-		__irq_set_handler_locked(irqd->irq, handle_level_irq);
+		irq_set_handler_locked(irqd, handle_level_irq);
 
 	jz4780_gpio_writel(jzgc, 1 << irqd->hwirq,
 			   (pat & 0x2) ? GPIO_PAT1S : GPIO_PAT1C);
