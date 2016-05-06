@@ -584,7 +584,6 @@ static int jz4780_pinctrl_parse_dt_gpio(struct jz4780_pinctrl *jzpc,
 
 	jzgc->gc.base = jzpc->base + (jzgc->idx * PINS_PER_GPIO_PORT);
 	jzgc->gc.ngpio = PINS_PER_GPIO_PORT;
-	jzgc->gc.dev = jzpc->dev;
 	jzgc->gc.of_node = np;
 	jzgc->gc.label = np->name;
 	jzgc->gc.owner = THIS_MODULE;
@@ -658,7 +657,7 @@ static int jz4780_pinctrl_parse_dt_pincfg(struct jz4780_pinctrl *jzpc,
 	if (!cfg_node)
 		return -EINVAL;
 
-	err = pinconf_generic_parse_dt_config(cfg_node, &configs,
+	err = pinconf_generic_parse_dt_config(cfg_node, jzpc->pctl, &configs,
 			&num_configs);
 	if (err)
 		return err;
