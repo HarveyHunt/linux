@@ -294,9 +294,9 @@ static struct irq_chip jz4780_gpio_irq_chip = {
 	.irq_set_type	= jz4780_gpio_irq_set_type,
 };
 
-static void jz4780_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+static void jz4780_gpio_irq_handler(struct irq_desc *desc)
 {
-	struct jz4780_gpio_chip *jzgc = irq_get_handler_data(irq);
+	struct jz4780_gpio_chip *jzgc = irq_desc_get_handler_data(desc);
 	unsigned long flag, i;
 
 	flag = jz4780_gpio_readl(jzgc, GPIO_FLG);
