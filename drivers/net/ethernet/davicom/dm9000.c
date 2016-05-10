@@ -1698,8 +1698,7 @@ dm9000_probe(struct platform_device *pdev)
 
 	if (ret == 0) {
 		if (inv_mac_addr)
-			dev_warn(db->dev, "%s: Invalid ethernet MAC address. Please set using ip\n",
-				 ndev->name);
+			dev_warn(db->dev, "%s: Invalid ethernet MAC address. Please set using ip\n", ndev->name);
 		printk(KERN_INFO "%s: dm9000%c at %p,%p IRQ %d MAC: %pM (%s)\n",
 		       ndev->name, dm9000_type_to_char(db->type),
 		       db->io_addr, db->io_data, ndev->irq,
