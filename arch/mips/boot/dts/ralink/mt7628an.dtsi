@@ -62,7 +62,7 @@
 			reg = <0x300 0x100>;
 		};
 
-		uart0@c00 {
+		uartlite@c00 {
 			compatible = "ns16550a";
 			reg = <0xc00 0x100>;
 
@@ -104,21 +104,21 @@
     
 	usbphy: phy@10120000 {
 		compatible = "mediatek,mt7620-usbphy";
-		reg = <0x10100000 0x1000>;
+		reg = <0x10120000 0x1000>;
 
-      	// FIXME: The MT7628 manual doesn't mention a reset bit for the
-      	// USB device, but the phy bindings say it is required...
-		resets = <&resetctrl 22>;
-		reset-names = "host";
+		// FIXME: The MT7628 manual doesn't mention a reset bit for the
+		// USB device, but the phy bindings say it is required...
+		resets = <&resetctrl 22 &resetctrl 25>;
+		reset-names = "host", "device";
 
 		#phy-cells = <0>;
 	};
 
 	ehci@101c0000 {
-		compatible = "ralink,rt3xxx-ehci";
+		compatible = "generic-ehci";
 		reg = <0x101c0000 0x1000>;
 
-		phys = <&usbphy 0>;
+		phys = <&usbphy>;
 		phy-names = "usb";
 
 		interrupt-parent = <&intc>;
