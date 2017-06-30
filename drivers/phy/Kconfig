@@ -62,4 +62,12 @@ source "drivers/phy/st/Kconfig"
 source "drivers/phy/tegra/Kconfig"
 source "drivers/phy/ti/Kconfig"
 
+config PHY_RALINK_USB
+	tristate "Ralink USB PHY driver"
+	select GENERIC_PHY
+	depends on RALINK
+	help
+	  This option enables support for the Ralink USB PHY found inside
+	  RT3352 and MT7620.
+
 endmenu
